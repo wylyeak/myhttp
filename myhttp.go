@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
@@ -20,7 +21,66 @@ type HttpClient struct {
 	header map[string]string
 }
 
-func (client *HttpClient) NewRequest(method, urlStr string, contentType string, body io.Reader) (*http.Request, error) {
+
+type IClient interface {
+	PostForm(url string, data url.Values) (*Response, error)
+	PostJson(url string, obj interface{}) (*Response, error)
+	MustPostJson(url string, obj interface{}) (*Response)
+	Get(url string, data url.Values) (*Response, error)
+	MustGet(url string, data url.Values) (*Response)
+}
+
+func (client *HttpClient) PostForm(url string, data url.Values) (*Response, error) {
+	return client.post(url, FormContentType, strings.NewReader(data.Encode()))
+}
+
+func (client *HttpClient) PostJson(url string, obj interface{}) (*Response, error) {
+	by, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	return client.post(url, JsonContentType, strings.NewReader(string(by)))
+}
+
+func (client *HttpClient) MustPostJson(url string, obj interface{}) (*Response) {
+	resp, err := client.PostJson(url, obj)
+	if err != nil {
+		panic(err)
+	}
+	return resp
+}
+
+func (client *HttpClient) post(url string, contentType string, body io.Reader) (*Response, error) {
+	req, err := client.newRequest("POST", url, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	return client.do(req)
+}
+
+func (client *HttpClient) Get(url string, data url.Values) (*Response, error) {
+	urlGet := &urlGet{url: url, data: data}
+	req, err := client.newRequest("GET", urlGet.parseUrl(), JsonContentType, nil)
+	if err != nil {
+		return nil, err
+	}
+	return client.do(req)
+}
+
+func (client *HttpClient) MustGet(url string, data url.Values) (*Response) {
+	resp, err := client.Get(url, data)
+	if err != nil {
+		panic(err)
+	}
+	return resp
+}
+
+func (client *HttpClient) do(req *http.Request) (*Response, error) {
+	oResp, err := client.client.Do(req)
+	return &Response{Resp: oResp}, err
+}
+
+func (client *HttpClient) newRequest(method, urlStr string, contentType string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, urlStr, body)
 	if err != nil {
 		return req, err
@@ -36,65 +96,8 @@ func (client *HttpClient) NewRequest(method, urlStr string, contentType string, 
 	}
 }
 
-func (client *HttpClient) PostForm(url string, data url.Values) (*Response, error) {
-	return client.Post(url, FormContentType, strings.NewReader(data.Encode()))
-}
-
-func (client *HttpClient) PostJson(url string, obj map[string]interface{}) (*Response, error) {
-	by, err := json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-	return client.Post(url, JsonContentType, strings.NewReader(string(by)))
-}
-
-func (client *HttpClient) MustPostJson(url string, obj interface{}) (*Response) {
-	by, err := json.Marshal(obj)
-	if err != nil {
-		panic(err)
-	}
-	response, err := client.Post(url, JsonContentType, strings.NewReader(string(by)))
-	if err != nil {
-		panic(err)
-	}
-	return response
-}
-
-func (client *HttpClient) Post(url string, contentType string, body io.Reader) (*Response, error) {
-	req, err := client.NewRequest("POST", url, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	return client.do(req)
-}
-
-func (client *HttpClient) Get(url string, data url.Values) (*Response, error) {
-	urlGet := &urlGet{url: url, data: data}
-	req, err := client.NewRequest("GET", urlGet.parseUrl(), JsonContentType, nil)
-	if err != nil {
-		return nil, err
-	}
-	return client.do(req)
-}
-
-func (client *HttpClient) MustGet(url string, data url.Values) (*Response) {
-	urlGet := &urlGet{url: url, data: data}
-	req, err := client.NewRequest("GET", urlGet.parseUrl(), JsonContentType, nil)
-	if err != nil {
-		panic(err)
-	}
-	response, err := client.do(req)
-	if err != nil {
-		panic(err)
-	}
-	return response
-}
-
-func (client *HttpClient) do(req *http.Request) (*Response, error) {
-	oResp, err := client.client.Do(req)
-	return &Response{Resp: oResp}, err
-}
 
 func NewHttpClient(header map[string]string) *HttpClient {
-	return &HttpClient{client: &http.Client{Timeout: time.Second * 10}, header: header}
+	jar, _ := cookiejar.New(nil)
+	return &HttpClient{client: &http.Client{Jar: jar, Timeout: time.Second * 10}, header: header}
 }
