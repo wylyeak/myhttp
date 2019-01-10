@@ -21,7 +21,6 @@ type HttpClient struct {
 	header map[string]string
 }
 
-
 type IClient interface {
 	PostForm(url string, data url.Values) (*Response, error)
 	PostJson(url string, obj interface{}) (*Response, error)
@@ -33,6 +32,15 @@ type IClient interface {
 func (client *HttpClient) PostForm(url string, data url.Values) (*Response, error) {
 	return client.post(url, FormContentType, strings.NewReader(data.Encode()))
 }
+
+func (client *HttpClient) MustPostForm(url string, data url.Values) (*Response) {
+	resp, err := client.PostForm(url, data)
+	if err != nil {
+		panic(err)
+	}
+	return resp
+}
+
 
 func (client *HttpClient) PostJson(url string, obj interface{}) (*Response, error) {
 	by, err := json.Marshal(obj)
@@ -56,6 +64,14 @@ func (client *HttpClient) post(url string, contentType string, body io.Reader) (
 		return nil, err
 	}
 	return client.do(req)
+}
+
+func (client *HttpClient) mustPost(url string, contentType string, body io.Reader) (*Response) {
+	resp, err := client.post(url, contentType, body)
+	if err != nil {
+		panic(err)
+	}
+	return resp
 }
 
 func (client *HttpClient) Get(url string, data url.Values) (*Response, error) {
@@ -95,7 +111,6 @@ func (client *HttpClient) newRequest(method, urlStr string, contentType string, 
 		return req, err
 	}
 }
-
 
 func NewHttpClient(header map[string]string) *HttpClient {
 	jar, _ := cookiejar.New(nil)
