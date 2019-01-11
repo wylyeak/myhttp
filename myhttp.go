@@ -105,7 +105,12 @@ func (client *HttpClient) newRequest(method, urlStr string, contentType string, 
 		req.Header.Set("Content-Type", contentType)
 		if client.header != nil {
 			for k, v := range client.header {
-				req.Header.Set(k, v)
+				if k == "Host" {
+					req.Host = v
+				} else {
+					req.Header.Set(k, v)
+				}
+
 			}
 		}
 		return req, err
