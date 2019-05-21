@@ -27,7 +27,11 @@ func (r *Response) StringBody() (string, error) {
 	} else {
 		defer r.Resp.Body.Close()
 		defer r.toggleBodyFlag()
-		charset := strings.Split(r.Resp.Header["Content-Type"][0], "=")[1]
+		charset := "UTF-8"
+		contentType, ok := r.Resp.Header["Content-Type"]
+		if ok && contentType != nil && len(contentType) >= 1 {
+			charset = strings.Split(contentType[0], "=")[1]
+		}
 		body, err := ioutil.ReadAll(mahonia.NewDecoder(charset).NewReader(r.Resp.Body))
 		if err != nil {
 			r.strBody = "ERROR"

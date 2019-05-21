@@ -2,6 +2,7 @@ package myhttp
 
 import (
 	"encoding/json"
+	"gopkg.in/ini.v1"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -40,7 +41,6 @@ func (client *HttpClient) MustPostForm(url string, data url.Values) (*Response) 
 	}
 	return resp
 }
-
 
 func (client *HttpClient) PostJson(url string, obj interface{}) (*Response, error) {
 	by, err := json.Marshal(obj)
@@ -120,4 +120,13 @@ func (client *HttpClient) newRequest(method, urlStr string, contentType string, 
 func NewHttpClient(header map[string]string) *HttpClient {
 	jar, _ := cookiejar.New(nil)
 	return &HttpClient{client: &http.Client{Jar: jar, Timeout: time.Second * 10}, header: header}
+}
+
+func NewHttpClientLoadByCfg(configFile string) *HttpClient {
+	cfg, err := ini.Load(configFile)
+	if err != nil {
+		panic(err)
+	}
+	configModel := LoadByCfg(cfg)
+	return NewHttpClient(configModel.Header)
 }
